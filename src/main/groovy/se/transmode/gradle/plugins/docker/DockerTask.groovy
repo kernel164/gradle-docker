@@ -26,12 +26,16 @@ class DockerTask extends DefaultTask {
 
     // full path to the docker executable
     String dockerBinary
+    String dockerOpts
+
     // Name and Email of the image maintainer
     String maintainer
     // Name of the application being wrapped into a docker image (default: project.name)
     String applicationName
     // What to tag the created docker image with (default: group/applicationName)
     String tag
+    String version
+
     // Whether or not to execute docker to build the image (default: false)
     Boolean dryRun
     // Whether or not to push the image into the registry (default: false)
@@ -70,14 +74,27 @@ class DockerTask extends DefaultTask {
     void addFile(Closure copySpec) {
         stageDir.mkdir()
         project.copy(copySpec)
-        instructions.add("ADD ${copySpec} ${destPath}")
+        instructions.add("ADD ${copySpec} /")
+    }
+
+    void addFile(String src, String dest) {
+        stageDir.mkdir()
+        project.copy {
+            from src
+            into stageDir
+        }
+        instructions.add("ADD ${src} ${dest}")
     }
 
     void workingDir(String wd) {
         instructions.add("WORKDIR ${wd}")
     }
 
-    void instruction(String cmd, String value) {
+    void setEnv(String key, String value) {
+        instructions.add("ENV ${key} ${value}")
+    }
+
+    void rawInstruction(String cmd, String value) {
         instructions.add("${cmd} ${value}")
     }
 
@@ -129,12 +146,11 @@ class DockerTask extends DefaultTask {
             }
         }
 
-        if (registry) {
-            tag = "${-> registry}/${-> applicationName}"
-        }
-        else {
-            tag = "${-> project.group}/${-> applicationName}"
-        }
+        tag = registry ? "${-> registry}/${-> applicationName}" : "${-> project.group}/${-> applicationName}"
+        if (version)
+            tag = "${-> tag}:${-> version}"
+
+        dockerOpts = dockerOpts ? "-t ${-> tag} ${-> dockerOpts}" : "-t ${-> tag}"
 
         if (!dryRun) {
             println buildDockerImage(tag)
@@ -159,7 +175,7 @@ class DockerTask extends DefaultTask {
     }
 
     private String buildDockerImage(String tag) {
-        def cmdLine = "${-> dockerBinary} build -t ${-> tag} ${-> stageDir}"
+        def cmdLine = "${-> dockerBinary} build ${-> dockerOpts} ${-> stageDir}"
         return executeAndWait(cmdLine)
     }
 }
