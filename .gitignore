@@ -6,3 +6,5 @@ gradle-docker.ipr
 gradle-docker.iws
 out
 *~
+.*
+gradle.properties

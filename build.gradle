@@ -1,6 +1,11 @@
 apply plugin: 'groovy'
+apply plugin: 'eclipse'
+apply plugin: 'maven-publish'
+apply plugin: 'bintray'
 
 group = 'se.transmode.gradle'
+
+task wrapper(type: Wrapper) { gradleVersion = '1.11' }
 
 buildscript {
     // inspired by https://github.com/Netflix/gradle-template
@@ -23,7 +28,8 @@ def getVersionName() {
     }
     return stdout.toString().trim()
 }
-version = getVersionName()
+version = "1.2"
+ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
 
 sourceSets {
     integTest {
@@ -78,4 +84,38 @@ artifacts {
     archives jar
     archives javadocJar
     archives sourcesJar
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            if (plugins.hasPlugin('war')) {
+                from components.web
+            } else {
+                from components.java
+            }
+
+            artifact sourcesJar {
+                classifier "sources"
+            }
+
+            artifact javadocJar {
+                classifier "javadoc"
+            }
+        }
+    }
+}
+
+bintray {
+    user = rootProject.hasProperty('bintrayUser') ? bintrayUser : ""
+    key = rootProject.hasProperty('bintrayKey') ? bintrayKey : ""
+    publications = ['mavenJava']
+    pkg {
+        repo = 'maven'
+        name = 'gradle-docker'
+        desc = 'gradle-docker'
+        licenses = ['Apache-2.0']
+        labels = ['gradle', 'docker']
+    }
+    dryRun = rootProject.hasProperty('dryRun') ? dryRun : false
 }
